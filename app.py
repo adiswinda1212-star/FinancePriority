@@ -5,16 +5,7 @@ from visualization import generate_donut_chart, generate_ratios
 from pdf_generator import generate_pdf_report
 from io import BytesIO
 
-# LOAD ENV (GROQ) 
-############################################# 
-load_dotenv() 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY") 
-if GROQ_API_KEY: 
-from groq import Groq 
-client = Groq(api_key=GROQ_API_KEY) 
-else: 
-client = None 
-#############################################
+
 
 st.set_page_config(page_title="Prioritas Keuangan", layout="wide")
 
@@ -51,36 +42,40 @@ if uploaded_file:
         st.success("✅ Laporan berhasil dibuat.")
         st.download_button("📥 Unduh PDF", data=pdf_bytes, file_name="laporan_keuangan.pdf")
 
+import os
 import pandas as pd
+import openai
+from dotenv import load_dotenv
 
-def classify_transaction(text):
-    text = text.lower()
-    if any(word in text for word in ['cicilan', 'angsuran', 'kredit']):
-        return "Kewajiban"
-    elif any(word in text for word in ['listrik', 'air', 'makan', 'transport']):
-        return "Kebutuhan"
-    elif any(word in text for word in ['tabungan', 'investasi', 'dana']):
-        return "Tujuan"
-    else:
-        return "Keinginan"
+load_dotenv()
+openai.api_key = os.getenv("GROQ_API_KEY")
+openai.api_base = "https://api.groq.com/openai/v1"  # Groq endpoint
+
+def classify_transaction_groq(text):
+    prompt = f"Klasifikasikan transaksi ini ke salah satu kategori: Kewajiban, Kebutuhan, Tujuan, Keinginan.\nTransaksi: '{text}'\nJawaban:"
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="mixtral-8x7b-32768",  # atau "llama3-70b-8192" jika tersedia
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=10
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("Error:", e)
+        return "Tidak Terkategori"
 
 def analyze_transactions(df):
     df = df.rename(columns=str.lower)
 
-    # Normalisasi kolom
     if 'jumlah' in df.columns:
         df['jumlah'] = df['jumlah'].astype(float)
-    elif 'debit' in df.columns and 'kredit' in df.columns:
-        df['jumlah'] = df['debit'].fillna(0) - df['kredit'].fillna(0)
 
-    if 'transaksi' in df.columns:
-        df['kategori'] = df['transaksi'].apply(classify_transaction)
-    elif 'deskripsi' in df.columns:
-        df['kategori'] = df['deskripsi'].apply(classify_transaction)
-    else:
-        df['kategori'] = 'Lainnya'
+    transaksi_col = 'transaksi' if 'transaksi' in df.columns else 'deskripsi'
+    df['kategori'] = df[transaksi_col].apply(classify_transaction_groq)
+    return df[[transaksi_col, 'jumlah', 'kategori']]
 
-    return df[['transaksi', 'jumlah', 'kategori']] if 'transaksi' in df.columns else df[['deskripsi', 'jumlah', 'kategori']]
 
 import plotly.express as px
 
