@@ -5,6 +5,17 @@ from visualization import generate_donut_chart, generate_ratios
 from pdf_generator import generate_pdf_report
 from io import BytesIO
 
+# LOAD ENV (GROQ) 
+############################################# 
+load_dotenv() 
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") 
+if GROQ_API_KEY: 
+from groq import Groq 
+client = Groq(api_key=GROQ_API_KEY) 
+else: 
+client = None 
+#############################################
+
 st.set_page_config(page_title="Prioritas Keuangan", layout="wide")
 
 st.title("📊 Aplikasi Prioritas Keuangan - T-K-K-K")
