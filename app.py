@@ -50,3 +50,94 @@ if uploaded_file:
         pdf_bytes = generate_pdf_report(df_analyzed, ratios)
         st.success("✅ Laporan berhasil dibuat.")
         st.download_button("📥 Unduh PDF", data=pdf_bytes, file_name="laporan_keuangan.pdf")
+
+import pandas as pd
+
+def classify_transaction(text):
+    text = text.lower()
+    if any(word in text for word in ['cicilan', 'angsuran', 'kredit']):
+        return "Kewajiban"
+    elif any(word in text for word in ['listrik', 'air', 'makan', 'transport']):
+        return "Kebutuhan"
+    elif any(word in text for word in ['tabungan', 'investasi', 'dana']):
+        return "Tujuan"
+    else:
+        return "Keinginan"
+
+def analyze_transactions(df):
+    df = df.rename(columns=str.lower)
+
+    # Normalisasi kolom
+    if 'jumlah' in df.columns:
+        df['jumlah'] = df['jumlah'].astype(float)
+    elif 'debit' in df.columns and 'kredit' in df.columns:
+        df['jumlah'] = df['debit'].fillna(0) - df['kredit'].fillna(0)
+
+    if 'transaksi' in df.columns:
+        df['kategori'] = df['transaksi'].apply(classify_transaction)
+    elif 'deskripsi' in df.columns:
+        df['kategori'] = df['deskripsi'].apply(classify_transaction)
+    else:
+        df['kategori'] = 'Lainnya'
+
+    return df[['transaksi', 'jumlah', 'kategori']] if 'transaksi' in df.columns else df[['deskripsi', 'jumlah', 'kategori']]
+
+import plotly.express as px
+
+def generate_donut_chart(df):
+    summary = df.groupby('kategori')['jumlah'].sum().abs().reset_index()
+    fig = px.pie(summary, names='kategori', values='jumlah', hole=0.4, title="Distribusi T-K-K-K")
+    return fig
+
+def generate_ratios(df):
+    total = df['jumlah'].abs().sum()
+    ratios = {}
+    for kategori in ['Kewajiban', 'Kebutuhan', 'Tujuan', 'Keinginan']:
+        subset = df[df['kategori'] == kategori]
+        amount = subset['jumlah'].abs().sum()
+        ratios[f"{kategori}/Total"] = f"{(amount/total*100):.2f}%"
+    return ratios
+
+from jinja2 import Template
+from weasyprint import HTML
+from io import BytesIO
+
+def generate_pdf_report(df, ratios):
+    html_template = """
+    <html>
+    <head><style>
+        body { font-family: Arial; padding: 20px; }
+        h1 { color: #2C3E50; }
+        table, th, td { border: 1px solid #ddd; border-collapse: collapse; padding: 8px; }
+    </style></head>
+    <body>
+        <h1>Laporan Keuangan</h1>
+        <h2>Rasio T-K-K-K</h2>
+        <ul>
+            {% for key, value in ratios.items() %}
+                <li><b>{{ key }}</b>: {{ value }}</li>
+            {% endfor %}
+        </ul>
+        <h2>Transaksi Terklasifikasi</h2>
+        <table>
+            <tr>
+                {% for col in df.columns %}
+                <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+            {% for row in df.itertuples() %}
+            <tr>
+                {% for cell in row[1:] %}
+                <td>{{ cell }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+    template = Template(html_template)
+    rendered_html = template.render(df=df, ratios=ratios)
+    pdf_file = BytesIO()
+    HTML(string=rendered_html).write_pdf(pdf_file)
+    return pdf_file.getvalue()
