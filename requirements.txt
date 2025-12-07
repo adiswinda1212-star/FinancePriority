@@ -5,3 +5,4 @@ matplotlib
 plotly
 weasyprint
 jinja2
+python-dotenv
