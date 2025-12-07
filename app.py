@@ -141,3 +141,63 @@ def generate_pdf_report(df, ratios):
 # pdf_bytes = generate_pdf_report(...)
 # st.download_button(...)
 
+from jinja2 import Template
+
+def export_report_as_html(df, ratios):
+    html_template = """
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #2c3e50; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background-color: #f4f4f4; }
+            ul { line-height: 1.6; }
+        </style>
+    </head>
+    <body>
+        <h1>Laporan Keuangan - PRIORITAS</h1>
+        <h2>📊 Rasio T-K-K-K</h2>
+        <ul>
+            {% for key, value in ratios.items() %}
+                <li><strong>{{ key }}</strong>: {{ value }}</li>
+            {% endfor %}
+        </ul>
+        <h2>📄 Transaksi Terklasifikasi</h2>
+        <table>
+            <thead>
+                <tr>
+                    {% for col in df.columns %}
+                        <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in df.itertuples(index=False) %}
+                    <tr>
+                        {% for cell in row %}
+                            <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
+    template = Template(html_template)
+    return template.render(df=df, ratios=ratios)
+from html_report import export_report_as_html
+
+# ...
+
+st.subheader("📤 Ekspor Laporan HTML")
+if st.button("🔽 Generate Laporan HTML"):
+    html_report = export_report_as_html(df_analyzed, ratios)
+    st.download_button(
+        label="📥 Unduh Laporan HTML",
+        data=html_report,
+        file_name="laporan_keuangan.html",
+        mime="text/html"
+    )
