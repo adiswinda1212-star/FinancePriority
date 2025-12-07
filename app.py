@@ -136,3 +136,8 @@ def generate_pdf_report(df, ratios):
     pdf_file = BytesIO()
     HTML(string=rendered_html).write_pdf(pdf_file)
     return pdf_file.getvalue()
+
+# Hapus atau komentar bagian ini
+# pdf_bytes = generate_pdf_report(...)
+# st.download_button(...)
+
